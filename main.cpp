@@ -4,17 +4,17 @@
 #include <vector>
 
 namespace Global {
-std::unordered_map<int32_t, int32_t> count;
-std::unordered_map<int32_t, int32_t> hashs;
-std::unordered_map<std::string, int32_t> index;
+std::unordered_map<int64_t, int64_t> count;
+std::unordered_map<int64_t, int64_t> hashs;
+std::unordered_map<std::string, int64_t> index;
 std::vector<std::string> strings;
 }  // namespace Global
 
-int32_t GetHash(const std::string& str) {
-  return std::hash<std::string>{}(str);
+int64_t GetHash(const std::string& str) {
+  return static_cast<int64_t>(std::hash<std::string>{}(str));
 }
-int32_t GetHashByIndex(int32_t index) { return Global::hashs[index]; }
-int32_t ToInt(char c) {
+int64_t GetHashByIndex(int64_t index) { return Global::hashs[index]; }
+int64_t ToInt(char c) {
   if (c >= 'A' && c <= 'Z') {
     return c - 'A';
   }
@@ -23,37 +23,35 @@ int32_t ToInt(char c) {
 
 struct Node {
  public:
-  Node() : ind_max_(-1) { next_.resize(26, nullptr); }
+  Node() : max_index_(-1) { next_.resize(26, nullptr); }
 
-  Node* GetNext(int32_t index) {
+  std::shared_ptr<Node> GetNext(int64_t index) {
     if (next_[index] == nullptr) {
-      next_[index] = new Node();
+      next_[index] = std::make_shared<Node>();
     }
     return next_[index];
   }
 
-  Node* GoNext(int32_t index) const { return next_[index]; }
-  int32_t GetIndexOfMax() const { return ind_max_; }
-  void SetIndexOfMax(int32_t index) { ind_max_ = index; }
+  std::shared_ptr<Node> GoNext(int64_t index) const { return next_[index]; }
+  int64_t GetIndexOfMax() const { return max_index_; }
+  void SetIndexOfMax(int64_t index) { max_index_ = index; }
 
  private:
-  std::vector<Node*> next_;
-  int32_t ind_max_;
+  std::vector<std::shared_ptr<Node>> next_;
+  int64_t max_index_;
 };
 
 class Bor {
  public:
-  Bor() { root_ = new Node(); }
-  ~Bor() { Delete(root_); }
+  Bor() { root_ = std::make_shared<Node>(); }
 
-  static void RecursiveAdd(Node* cur, const std::string& str, int32_t cur_index,
-                           int32_t str_index, int32_t str_hash) {
-    if (cur_index == str.size()) {
-      return;
+  static void RecursiveAdd(const std::shared_ptr<Node>& cur,
+                           const std::string& str, int64_t cur_index,
+                           int64_t str_index, int64_t str_hash) {
+    if (cur_index != str.size()) {
+      RecursiveAdd(cur->GetNext(ToInt(str[cur_index])), str, cur_index + 1,
+                   str_index, str_hash);
     }
-    RecursiveAdd(cur->GetNext(ToInt(str[cur_index])), str, cur_index + 1,
-                 str_index, str_hash);
-
     if (cur->GetIndexOfMax() == -1 ||
         Global::count[str_hash] >
             Global::count[GetHashByIndex(cur->GetIndexOfMax())]) {
@@ -61,16 +59,16 @@ class Bor {
     }
   }
 
-  void Add(const std::string& str, int32_t str_index) const {
-    int32_t hash = GetHash(str);
+  void Add(const std::string& str, int64_t str_index) const {
+    int64_t hash = GetHash(str);
     ++Global::count[hash];
     RecursiveAdd(root_, str, 0, str_index, hash);
   }
 
-  Node* Get(const std::string& str) const {
-    Node* cur = root_;
-    for (int32_t i = 0; i < str.size(); ++i) {
-      cur = cur->GoNext(ToInt(str[i]));
+  std::shared_ptr<Node> Get(const std::string& str) const {
+    std::shared_ptr<Node> cur = root_;
+    for (char i : str) {
+      cur = cur->GoNext(ToInt(i));
       if (cur == nullptr) {
         return nullptr;
       }
@@ -78,7 +76,7 @@ class Bor {
     return cur;
   }
 
-  static Node* Continue(Node* cur, char c) {
+  static std::shared_ptr<Node> Continue(std::shared_ptr<Node> cur, char c) {
     if (cur == nullptr) {
       return nullptr;
     }
@@ -90,28 +88,20 @@ class Bor {
   }
 
  private:
-  void Delete(Node* cur) {
-    if (cur == nullptr) {
-      return;
-    }
-    for (int32_t i = 0; i < 26; i++) {
-      Delete(cur->GoNext(i));
-    }
-    delete cur;
-  }
-  Node* root_;
+  std::shared_ptr<Node> root_;
 };
 
-void AddingText(Bor& bor, const std::string& text) {
-  int32_t last = 0;
+void AddingText(const Bor& bor, const std::string& text) {
+  int64_t last = 0;
   std::string str;
-  for (int32_t i = 0; i <= text.size(); ++i) {
+  for (int64_t i = 0; i <= text.size(); ++i) {
     if (i == text.size() || text[i] == ' ') {
       if (last != i) {
         str = text.substr(last, i - last);
         if (Global::index.find(str) == Global::index.end()) {
-          Global::index[str] = Global::strings.size();
-          Global::hashs[Global::strings.size()] = GetHash(str);
+          Global::index[str] = static_cast<int64_t>(Global::strings.size());
+          Global::hashs[static_cast<int64_t>(Global::strings.size())] =
+              GetHash(str);
           Global::strings.push_back(str);
         }
         bor.Add(str, Global::index[str]);
@@ -121,17 +111,17 @@ void AddingText(Bor& bor, const std::string& text) {
   }
 }
 
-int32_t main() {
+int main() {
   std::ios_base::sync_with_stdio(false);
   std::cin.tie(nullptr);
 
   Bor Aminoff;
 
-  int32_t type;
+  int64_t type;
   std::string text;
-  std::string last_str;
+  std::string last_str = "";
   char c;
-  Node* last = nullptr;
+  std::shared_ptr<Node> last = nullptr;
   while (true) {
     std::cin >> type;
 
@@ -141,17 +131,19 @@ int32_t main() {
     if (type == 1) {  // добавить текст
       std::getline(std::cin, text);
       std::getline(std::cin, text);
-      std::cout << "Adding " << text << std::endl;
       AddingText(Aminoff, text);
       continue;
     }
     if (type == 2) {  // новый запрос
       std::cin >> last_str;
       last = Aminoff.Get(last_str);
-    } else {  // дописывание
+    } else if (type == 3) {  // дописывание
       std::cin >> c;
       last_str += c;
-      last = Aminoff.Continue(last, c);
+      last = Bor::Continue(last, c);
+    } else {
+      std::cout << "Please enter a valid option." << std::endl;
+      continue;
     }
     if (last == nullptr) {
       std::cout << last_str << std::endl;
