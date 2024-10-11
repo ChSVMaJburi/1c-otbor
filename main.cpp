@@ -45,6 +45,35 @@ class Bor {
  public:
   Bor() { root_ = std::make_shared<Node>(); }
 
+  void Add(const std::string& str, int64_t str_index) const {
+    int64_t hash = GetHash(str);
+    ++Global::count[hash];
+    RecursiveAdd(root_, str, 0, str_index, hash);
+  }
+
+  int64_t Get(const std::string& str) {
+    last_ = root_;
+    for (char i : str) {
+      last_ = last_->GoNext(ToInt(i));
+      if (last_ == nullptr) {
+        return -1;
+      }
+    }
+    return last_->GetIndexOfMax();
+  }
+
+  int64_t Continue(char c) {
+    if (last_ == nullptr) {
+      return -1;
+    }
+    last_ = last_->GoNext(ToInt(c));
+    if (last_ == nullptr) {
+      return -1;
+    }
+    return last_->GetIndexOfMax();
+  }
+
+ private:
   static void RecursiveAdd(const std::shared_ptr<Node>& cur,
                            const std::string& str, int64_t cur_index,
                            int64_t str_index, int64_t str_hash) {
@@ -58,37 +87,8 @@ class Bor {
       cur->SetIndexOfMax(str_index);
     }
   }
-
-  void Add(const std::string& str, int64_t str_index) const {
-    int64_t hash = GetHash(str);
-    ++Global::count[hash];
-    RecursiveAdd(root_, str, 0, str_index, hash);
-  }
-
-  std::shared_ptr<Node> Get(const std::string& str) const {
-    std::shared_ptr<Node> cur = root_;
-    for (char i : str) {
-      cur = cur->GoNext(ToInt(i));
-      if (cur == nullptr) {
-        return nullptr;
-      }
-    }
-    return cur;
-  }
-
-  static std::shared_ptr<Node> Continue(std::shared_ptr<Node> cur, char c) {
-    if (cur == nullptr) {
-      return nullptr;
-    }
-    cur = cur->GoNext(ToInt(c));
-    if (cur == nullptr) {
-      return nullptr;
-    }
-    return cur;
-  }
-
- private:
   std::shared_ptr<Node> root_;
+  std::shared_ptr<Node> last_{nullptr};
 };
 
 void AddingText(const Bor& bor, const std::string& text) {
@@ -119,9 +119,9 @@ int main() {
 
   int64_t type;
   std::string text;
-  std::string last_str = "";
+  std::string last_str;
   char c;
-  std::shared_ptr<Node> last = nullptr;
+  int64_t index;
   while (true) {
     std::cin >> type;
 
@@ -136,19 +136,19 @@ int main() {
     }
     if (type == 2) {  // новый запрос
       std::cin >> last_str;
-      last = Aminoff.Get(last_str);
+      index = Aminoff.Get(last_str);
     } else if (type == 3) {  // дописывание
       std::cin >> c;
       last_str += c;
-      last = Bor::Continue(last, c);
+      index = Aminoff.Continue(c);
     } else {
       std::cout << "Please enter a valid option." << std::endl;
       continue;
     }
-    if (last == nullptr) {
+    if (index == -1) {
       std::cout << last_str << std::endl;
     } else {
-      std::cout << Global::strings[last->GetIndexOfMax()] << std::endl;
+      std::cout << Global::strings[index] << std::endl;
     }
   }
 }
